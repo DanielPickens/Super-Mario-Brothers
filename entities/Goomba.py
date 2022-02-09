@@ -5,7 +5,7 @@ from classes.Maths import Vec2D
 from entities.EntityBase import EntityBase
 from traits.leftrightwalk import LeftRightWalkTrait
 
-
+#load goomba object and call the parameter from EntityBase as a pass by reference variable
 class Goomba(EntityBase):
     def __init__(self, screen, spriteColl, x, y, level, sound):
         super(Goomba, self).__init__(y, x - 1, 1.25)
@@ -61,13 +61,13 @@ class Goomba(EntityBase):
     def movePointsTextUpAndDraw(self, camera):
         self.textPos.y += -0.5
         self.dashboard.drawText("100", self.textPos.x + camera.x, self.textPos.y, 8)
-    
+           # check on entity state and iterates across levelObJ in entityList for ent, and says that if Collision state is instantiated using an instance of  class  EntityCollder on pass reference to ent, then ent type is mob
     def checkEntityCollision(self):
         for ent in self.levelObj.entityList:
-            collisionState = self.EntityCollider.check(ent)
+            collisionState = self.EntityCollider.check(ent) 
             if collisionState.isColliding:
                 if ent.type == "Mob":
-                    self._onCollisionWithMob(ent, collisionState)
+                    self._onCollisionWithMob(ent, collisionState) 
 
     def _onCollisionWithMob(self, mob, collisionState):
         if collisionState.isColliding and mob.bouncing:
