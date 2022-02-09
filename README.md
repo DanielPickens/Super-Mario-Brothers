@@ -28,7 +28,7 @@ pygame
 scipy	
 
 
-# Execution:
+# Execution
 ```
 git clone https://github.com/DanielPickens/Mario-Brothers.git
 cd mariobrothers
