@@ -3,10 +3,13 @@
 [![forthebadge](https://forthebadge.com/images/badges/built-with-love.svg)](https://forthebadge.com)
 
 
-# Development 
+# Getting Started
 ```
- pip install 
- python compile.py 
+ pip install
+```
+```
+ sudo apt install scipy
+ sudo apt install pygame
  ```
 
 # Controls
