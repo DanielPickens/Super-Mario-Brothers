@@ -33,7 +33,7 @@ bigAnimation = Animation(
     spriteCollection["mario_big_jump"].image,
 )
 
-
+#load mario object and game attributes
 class Mario(EntityBase):
     def __init__(self, x, y, level, screen, dashboard, sound, gravity=0.8):
         super(Mario, self).__init__(x, y, gravity)
@@ -68,7 +68,7 @@ class Mario(EntityBase):
         self.applyGravity()
         self.checkEntityCollision()
         self.input.checkForInput()
-
+        
     def moveMario(self):
         self.rect.y += self.vel.y
         self.collision.checkY()
@@ -178,7 +178,7 @@ class Mario(EntityBase):
     def setPos(self, x, y):
         self.rect.x = x
         self.rect.y = y
-        
+            #logic for powerup state component
     def powerup(self, powerupID):
         if self.powerUpState == 0:
             if powerupID == 1:
