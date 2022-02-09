@@ -24,6 +24,7 @@
 
 # Dependencies	
 pygame	
+
 scipy	
 
 
