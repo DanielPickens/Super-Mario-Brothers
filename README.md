@@ -10,8 +10,8 @@ sudo apt-get install python3.6
 
 ```
 ```
- sudo apt install scipy
- sudo apt install pygame
+sudo apt install scipy
+sudo apt install pygame
  ```
 
 # Controls
