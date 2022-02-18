@@ -7,6 +7,7 @@ FROM $BASE_IMAGE_NAME AS builder
 ENV PYTHON_VERSION=3.10.0
 ENV PYTHON_PIP_VERSION=21.3.1
 
+ENV GPG_KEY=8EEF909F630235D1A0DE9F642BEA0AC23E9020DC
 # https://github.com/pypa/get-pip
 ENV PYTHON_GET_PIP_URL https://raw.githubusercontent.com/pypa/get-pip/${PYTHON_PIP_VERSION}/public/get-pip.py
 ENV PYTHON_GET_PIP_SHA256=c518250e91a70d7b20cceb15272209a4ded2a0c263ae5776f129e0d9b5674309
@@ -41,6 +42,17 @@ RUN set -e && \
 		xz-utils \
 		zlib1g-dev
 
+# Download Python source and verify signature with GPG
+RUN wget --no-verbose --output-document=python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz" \
+	&& wget --no-verbose --output-document=python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc" \
+	&& export GNUPGHOME="$(mktemp -d)" \
+	&& gpg --batch --keyserver keys.openpgp.org --recv-keys "$GPG_KEY" \
+	&& gpg --batch --verify python.tar.xz.asc python.tar.xz \
+	&& { command -v gpgconf > /dev/null && gpgconf --kill all || :; } \
+	&& rm -rf "$GNUPGHOME" python.tar.xz.asc \
+	&& mkdir -p /usr/src/python \
+	&& tar -xJC /usr/src/python --strip-components=1 -f python.tar.xz \
+	&& rm python.tar.xz
 
 # Compile Python source
 RUN cd /usr/src/python \
