@@ -1,125 +1,175 @@
-ARG BASE_IMAGE_NAME=debian:bullseye-slim
+ARG PYTHON_VER
 
-# Intermediate build container
-FROM $BASE_IMAGE_NAME AS builder
+FROM python:${PYTHON_VER}-alpine
 
-# Set Python and Pip versions
-ENV PYTHON_VERSION=3.10.0
-ENV PYTHON_PIP_VERSION=21.3.1
+ARG PYTHON_DEV
 
-ENV GPG_KEY=8EEF909F630235D1A0DE9F642BEA0AC23E9020DC
-# https://github.com/pypa/get-pip
-ENV PYTHON_GET_PIP_URL https://raw.githubusercontent.com/pypa/get-pip/${PYTHON_PIP_VERSION}/public/get-pip.py
-ENV PYTHON_GET_PIP_SHA256=c518250e91a70d7b20cceb15272209a4ded2a0c263ae5776f129e0d9b5674309
+ARG DANIELPICKENS_USER_ID=1000
+ARG DANIEKPICKENS_GROUP_ID=1000
 
-ARG BASE_IMAGE_NAME
-RUN echo "Using base image \"${BASE_IMAGE_NAME}\" to build Python ${PYTHON_VERSION}"
+ENV PYTHON_DEV="${PYTHON_DEV}" \
+    SSHD_PERMIT_USER_ENV="yes"
 
-# http://bugs.python.org/issue19846
-# > At the moment, setting "LANG=C" on a Linux system *fundamentally breaks Python 3*, and that's not OK.
-ENV LANG=C.UTF-8
-ENV DEBIAN_FRONTEND=noninteractive
+ENV APP_ROOT="/usr/src/app" \
+    CONF_DIR="/usr/src/app" \
+    FILES_DIR="/mnt/files" \
+    SSHD_HOST_KEYS_DIR="/etc/ssh" \
+    ENV="/home/danielpickens/.shrc" \
+    \
+    GIT_USER_EMAIL="danielpickens@example.com" \
+    GIT_USER_NAME="danielpickens"
 
-# Install build dependencies
-RUN set -e && \
-	apt-get update && apt-get install --assume-yes --no-install-recommends \
-		ca-certificates \
-		dirmngr \
-		dpkg-dev \
-		gcc \
-		gnupg \
-		libbz2-dev \
-		libc6-dev \
-		libexpat1-dev \
-		libffi-dev \
-		liblzma-dev \
-		libsqlite3-dev \
-		libssl-dev \
-		make \
-		netbase \
-		uuid-dev \
-		wget \
-		xz-utils \
-		zlib1g-dev
+ENV MARIOBROTHERS_APP="myapp.wsgi:application" \
+    PIP_USER=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/home/danielpickens/.local/bin:${PATH}"
 
-# Download Python source and verify signature with GPG
-RUN wget --no-verbose --output-document=python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz" \
-	&& wget --no-verbose --output-document=python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc" \
-	&& export GNUPGHOME="$(mktemp -d)" \
-	&& gpg --batch --keyserver keys.openpgp.org --recv-keys "$GPG_KEY" \
-	&& gpg --batch --verify python.tar.xz.asc python.tar.xz \
-	&& { command -v gpgconf > /dev/null && gpgconf --kill all || :; } \
-	&& rm -rf "$GNUPGHOME" python.tar.xz.asc \
-	&& mkdir -p /usr/src/python \
-	&& tar -xJC /usr/src/python --strip-components=1 -f python.tar.xz \
-	&& rm python.tar.xz
+ARG TARGETPLATFORM
 
-# Compile Python source
-RUN cd /usr/src/python \
-	&& gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)" \
-	&& ./configure \
-		--build="$gnuArch" \
-		--prefix="/python" \
-		--enable-loadable-sqlite-extensions \
-		--enable-optimizations \
-		--enable-ipv6 \
-		--disable-shared \
-		--with-system-expat \
-		--with-system-ffi \
-		--without-ensurepip \
-	&& make -j "$(nproc)" LDFLAGS="-Wl,--strip-all" \
-	&& make install
+RUN set -xe; \
+    \
+#    addgroup -g 82 -S www-data; \
+    adduser -u 82 -D -S -G www-data www-data; \
+    \
+    # Delete existing user/group if uid/gid occupied.
+    existing_group=$(getent group "${DANIELPICKENS_GROUP_ID}" | cut -d: -f1); \
+    if [[ -n "${existing_group}" ]]; then delgroup "${existing_group}"; fi; \
+    existing_user=$(getent passwd "${DANIELPICKENS_USER_ID}" | cut -d: -f1); \
+    if [[ -n "${existing_user}" ]]; then deluser "${existing_user}"; fi; \
+    \
+	addgroup -g "${WODBY_GROUP_ID}" -S wodby; \
+	adduser -u "${WODBY_USER_ID}" -D -S -s /bin/bash -G wodby wodby; \
+	adduser wodby www-data; \
+	sed -i '/^wodby/s/!/*/' /etc/shadow; \
+    \
+    apk add --update --no-cache -t .wodby-python-run-deps \
+        bash \
+        ca-certificates \
+        curl \
+        freetype \
+        git \
+        gmp \
+        gzip \
+        icu-libs \
+        imagemagick \
+        less \
+        libbz2 \
+        libjpeg-turbo-utils \
+        libjpeg-turbo \
+        libldap \
+        libmemcached-libs \
+        libpng \
+        librdkafka \
+        libxslt \
+        make \
+        mariadb-client \
+        mariadb-connector-c \
+        nano \
+        openssh \
+        openssh-client \
+        patch \
+        postgresql-client \
+        rabbitmq-c \
+        rsync \
+        su-exec \
+        sudo \
+        tar \
+        tig \
+        tmux \
+        unzip \
+        wget \
+        yaml; \
+    \
+    # Install redis-cli.
+    apk add --update --no-cache redis; \
+    mv /usr/bin/redis-cli /tmp/; \
+    apk del --purge redis; \
+    deluser redis; \
+    mv /tmp/redis-cli /usr/bin; \
+    \
+    if [[ -n "${PYTHON_DEV}" ]]; then \
+        apk add --update --no-cache -t .wodby-python-build-deps \
+            build-base \
+            gcc \
+            imagemagick-dev \
+            jpeg-dev \
+            libffi-dev \
+            linux-headers \
+            mariadb-dev \
+            musl-dev \
+            postgresql-dev; \
+    fi; \
+    \
+    # Download helper scripts.
+    dockerplatform=${TARGETPLATFORM:-linux/amd64}; \
+    gotpl_url="https://github.com/wodby/gotpl/releases/download/0.3.3/gotpl-${dockerplatform/\//-}.tar.gz"; \
+    wget -qO- "${gotpl_url}" | tar xz --no-same-owner -C /usr/local/bin; \
+    git clone https://github.com/danielpickens/alpine /tmp/alpine; \
+    cd /tmp/alpine; \
+    latest=$(git describe --abbrev=0 --tags); \
+    git checkout "${latest}"; \
+    mv /tmp/alpine/bin/* /usr/local/bin; \
+    \
+    { \
+        echo 'export PS1="\u@${DANIELPICKENS_APP_NAME:-python}.${WODBY_ENVIRONMENT_NAME:-container}:\w $ "'; \
+        echo "export PATH=${PATH}"; \
+    } | tee /home/danielpickens/.shrc; \
+    \
+    cp /home/danielpickens/.shrc /home/danielpickens/.bashrc; \
+    cp /home/danielpickens/.shrc /home/danielpickens/.bash_profile; \
+    \
+  
+    { \
+        echo 'Defaults env_keep += "APP_ROOT FILES_DIR"' ; \
+        \
+        if [[ -n "${PYTHON_DEV}" ]]; then \
+            echo 'danielpickens ALL=(root) NOPASSWD:SETENV:ALL'; \
+        else \
+            echo -n 'danielpickens ALL=(root) NOPASSWD:SETENV: ' ; \
+            echo -n '/usr/local/bin/files_chmod, ' ; \
+            echo -n '/usr/local/bin/files_chown, ' ; \
+            echo -n '/usr/local/bin/files_sync, ' ; \
+            echo -n '/usr/local/bin/gen_ssh_keys, ' ; \
+            echo -n '/usr/local/bin/init_container, ' ; \
+            echo -n '/usr/sbin/sshd, ' ; \
+            echo '/usr/sbin/crond' ; \
+        fi; \
+    } | tee /etc/sudoers.d/danielpickens; \
+    \
+    echo "TLS_CACERTDIR /etc/ssl/certs/" >> /etc/openldap/ldap.conf; \
+    \
+    install -o danielpickens -g danielpickens -d \
+        "${APP_ROOT}" \
+        "${CONF_DIR}" \
+        /usr/local/etc/mariobrothers/ \
+        /home/danielpickens/.pip \
+        /home/danielpickens/.ssh; \
+    \
+    install -o www-data -g www-data -d \
+        /home/www-data/.ssh \
+        "${FILES_DIR}/public" \
+        "${FILES_DIR}/private"; \
+    \
+    chmod -R 775 "${FILES_DIR}"; \
+    su-exec danielpickens touch /usr/local/etc/mariobrothers/config.py; \
+    \
+    touch /etc/ssh/sshd_config; \
+    chown danielpickens: /etc/ssh/sshd_config /home/danielpickens/.*; \
+    \
+    rm -rf \
+        /etc/crontabs/root \
+        /tmp/* \
+        /var/cache/apk/*
 
-# Install pip
-RUN set -ex; \
-	\
-	wget --no-verbose --output-document=get-pip.py "$PYTHON_GET_PIP_URL"; \
-	echo "$PYTHON_GET_PIP_SHA256 *get-pip.py" | sha256sum --check --strict -; \
-	\
-	/python/bin/python3 get-pip.py \
-		--disable-pip-version-check \
-		--no-cache-dir \
-		"pip==$PYTHON_PIP_VERSION" "wheel"
+USER DanielPickens
 
-# Remove unecessary libraries
-RUN find /python/lib -type d -a \( \
-		-name __pycache__ -o \
-		-name test -o \
-		-name tests -o \
-		-name idlelib -o \
-		-name idle_test -o \
-		-name turtledemo -o \
-		-name pydoc_data -o \
-		-name tkinter \) \
-		-exec rm -rf '{}' +
+WORKDIR ${APP_ROOT}
+EXPOSE 8000
 
-RUN find /python/lib -type f -a \( \
-		-name '*.a' -o \
-		-name '*.pyc' -o \
-		-name '*.pyo' -o \
-		-name '*.exe' \) \
-		-exec rm '{}' +
+COPY --chown=danielpickens:danielpickens mariobrothers.init.d /etc/init.d/mariobrothers
+COPY templates /etc/gotpl/
+COPY docker-entrypoint.sh /
+COPY bin /usr/local/bin/
 
-# App container
-FROM $BASE_IMAGE_NAME AS app
-
-ENV LANG=C.UTF-8 \
-    DEBIAN_FRONTEND=noninteractive \
-    PIP_NO_CACHE_DIR=true
-
-# Create symlinks that are expected to exist
-RUN ln -s /python/bin/python3-config /usr/local/bin/python-config && \
-	ln -s /python/bin/python3 /usr/local/bin/python && \
-	ln -s /python/bin/python3 /usr/local/bin/python3 && \
-	ln -s /python/bin/pip3 /usr/local/bin/pip && \
-	ln -s /python/bin/pip3 /usr/local/bin/pip3 && \
-	# Install dependencies
-	apt-get update && \
-	apt-get install --assume-yes --no-install-recommends ca-certificates libexpat1 libsqlite3-0 libssl1.1 && \
-	apt-get purge --assume-yes --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
-	rm -rf /var/lib/apt/lists/*
-
-# Copy Python files
-COPY --from=builder /python /python
-
-CMD ["python3"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["/etc/init.d/mariobrothers"]
