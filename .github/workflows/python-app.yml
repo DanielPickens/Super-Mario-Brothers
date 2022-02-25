@@ -1,4 +1,4 @@
-name: mario python workflow
+name:  python-app.yaml ci
 on: [push]
 jobs:
   check-pygame:
