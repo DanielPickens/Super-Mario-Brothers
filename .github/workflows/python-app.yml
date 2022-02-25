@@ -1,4 +1,4 @@
-name: install-pygame
+name: mario python workflow
 on: [push]
 jobs:
   check-pygame:
