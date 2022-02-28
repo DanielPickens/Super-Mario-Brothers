@@ -31,7 +31,7 @@ scipy
 
 # Execution
 ```
-git clone https://github.com/DanielPickens/Mario-Brothers.git
-cd mariobrothers
+git clone https://github.com/DanielPickens/Super-Mario-Brothers.git
+cd supermariobrothers
 python main.py
 ```
