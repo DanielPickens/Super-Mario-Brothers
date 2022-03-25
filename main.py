@@ -27,6 +27,7 @@ def main():
 
     while not mario.restart:
         pygame.display.set_caption("Super Mario running with {:d} FPS".format(int(clock.get_fps())))
+        clock.tick(max_frame_rate) #limit the frame rate to 60 FPS
         if mario.pause:
             mario.pauseObj.update()
         else:
