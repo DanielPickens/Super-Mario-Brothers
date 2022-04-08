@@ -40,6 +40,6 @@ def main():
 
 
 if __name__ == "__main__":
-    EXITMESSAGE = 'restart'
-    while EXITMESSAGE == 'restart':
-        EXITMESSAGE = main()
+    exitmessage = 'restart'
+    while exitmessage == 'restart':
+        exitmessage = main()
